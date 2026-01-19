@@ -93,7 +93,7 @@ if "builder_messages" not in st.session_state:
     st.session_state.builder_messages = [
         {
             "role": "assistant",
-            "content": "👋 欢迎使用 Agent Builder！\n\n我可以帮你创建定制化的 AI Agent。请告诉我你想要创建什么样的 Agent，比如：\n- 预约助手\n请描述你的需求，我会帮你一步步构建！！"
+            "content": "👋 欢迎使用 Agent Builder！\n\n我可以帮你创建定制化的 AI Agent。请告诉我你想要创建什么样的 Agent，比如：\n- 预约助手\n请描述你的需求，我会帮你一步步构建！！!"
         }
     ]
 if "entrance_messages" not in st.session_state:
