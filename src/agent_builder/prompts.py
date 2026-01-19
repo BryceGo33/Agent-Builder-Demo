@@ -22,8 +22,8 @@ Follow this workflow for all agent building requests:
    - After `agent_sop.md` generated or updated, delegate to config-manager-agent to generate the agent configuration based on the agent sop (read from `agent_sop.md` file)
    - Config-manager-agent will also generate mock conversation examples automatically after agent configuration generated
    - **IMPORTANT**: Pass the user's language to config-manager-agent so it generates everything in the correct language
-6. **Finalize**: Configuration is stored in state and ready for use
-7. It can be updated at any time by re-running the agent builder workflow.
+6. It can be updated at any time by re-running the agent builder workflow.
+7. Not need to tell user about the agent building process, just follow the plan and do it.
 
 ## Agent Building Guidelines
 

@@ -457,12 +457,34 @@ def update_state_from_agent(state):
     if state.values.get("mock_conversations"):
         mock_conv = state.values["mock_conversations"]
         logger.info(f"Mock conversations found: {len(mock_conv) if isinstance(mock_conv, list) else 'unknown'}")
+        logger.info(f"Mock conversations type: {type(mock_conv)}")
+        
         if isinstance(mock_conv, list) and len(mock_conv) > 0:
-            st.session_state.mock_conversations = [
-                {"role": "User" if msg.type == "human" else "Agent", "content": msg.content}
-                for msg in mock_conv
-            ]
-            logger.info(f"Mock conversations updated: {len(st.session_state.mock_conversations)} messages")
+            logger.info(f"First message type: {type(mock_conv[0])}, has 'type' attr: {hasattr(mock_conv[0], 'type')}")
+            if hasattr(mock_conv[0], 'type'):
+                logger.info(f"First message.type: {mock_conv[0].type}")
+            
+            try:
+                st.session_state.mock_conversations = [
+                    {"role": "User" if msg.type == "human" else "Agent", "content": msg.content}
+                    for msg in mock_conv
+                ]
+                logger.info(f"Mock conversations updated: {len(st.session_state.mock_conversations)} messages")
+                logger.info(f"Sample mock conversation: {st.session_state.mock_conversations[0] if st.session_state.mock_conversations else 'None'}")
+            except Exception as e:
+                logger.error(f"Error updating mock conversations: {str(e)}", exc_info=True)
+                # Fallback: try to handle different message formats
+                st.session_state.mock_conversations = []
+                for msg in mock_conv:
+                    try:
+                        if hasattr(msg, 'type') and hasattr(msg, 'content'):
+                            role = "User" if msg.type == "human" else "Agent"
+                            st.session_state.mock_conversations.append({"role": role, "content": msg.content})
+                        elif isinstance(msg, dict):
+                            st.session_state.mock_conversations.append(msg)
+                    except Exception as msg_error:
+                        logger.error(f"Error processing message: {msg_error}")
+                logger.info(f"Mock conversations updated (fallback): {len(st.session_state.mock_conversations)} messages")
 
     # Update todos for display
     if state.values.get("todos"):
