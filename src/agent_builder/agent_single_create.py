@@ -106,7 +106,7 @@ def create_agent_from_config(agent_config: AgentConfig):
 
         # Create the skill agent with mock tools
         skill_agent = create_agent(
-            model=init_chat_model(model="openai:gpt-4o-mini"),
+            model=init_chat_model(model="openai:gpt-4o"),
             tools=mock_tools,
             system_prompt=skill_prompt,
         )

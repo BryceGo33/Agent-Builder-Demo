@@ -32,22 +32,22 @@ def ask_user_to_provide_info(confirm_message: str):
     )
 
 
-@tool(parse_docstring=True)
-def ask_user_to_confirm_build(confirm_message: str):
-    """After generating the sop, ask user whether start to build agent config or add more details
+# @tool(parse_docstring=True)
+# def ask_user_to_confirm_build(confirm_message: str):
+#     """After generating the sop, ask user whether start to build agent config or add more details
 
-    Args:
-        confirm_message: Message to ask user
+#     Args:
+#         confirm_message: Message to ask user
 
-    Returns:
-        interrupt
-    """
-    return interrupt(
-        {
-            "tool": "ask_user_to_confirm_build",
-            "confirm_message": confirm_message,
-        }
-    )
+#     Returns:
+#         interrupt
+#     """
+#     return interrupt(
+#         {
+#             "tool": "ask_user_to_confirm_build",
+#             "confirm_message": confirm_message,
+#         }
+#     )
 
 
 def _fetch_webpage_content_impl(url: str) -> str:

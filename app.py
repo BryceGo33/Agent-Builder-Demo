@@ -20,7 +20,6 @@ from src.agent_builder.tools import (
     fetch_webpage_content,
     think_tool,
     ask_user_to_provide_info,
-    ask_user_to_confirm_build,
 )
 from src.agent_builder.models import AVAILABLE_TOOLS, AgentConfig
 from src.agent_builder.middleware import AgentConfigMiddleware
@@ -181,7 +180,7 @@ def initialize_builder_agent():
     agent = create_deep_agent(
         model=model,
         checkpointer=checkpointer,
-        tools=[ask_user_to_provide_info, ask_user_to_confirm_build],
+        tools=[ask_user_to_provide_info],
         system_prompt=INSTRUCTIONS,
         subagents=[web_search_agent, config_manager_agent],
         middleware=[AgentConfigMiddleware()],
@@ -352,7 +351,7 @@ def process_stream_chunk_realtime(chunk, chat_container=None):
             todos = node_output["todos"]
             if todos:
                 status_parts.append(f"\n✅ TODOs: {len(todos)} items")
-                todo_preview = "\n".join([f"  - [{t.get('status', 'pending')}] {t.get('content', 'N/A')}" for t in todos[:3]])
+                todo_preview = "\n".join([f"  - [{t.get('status', 'pending')}] {t.get('content', 'N/A')}" for t in todos])
                 status_parts.append(f"\n{todo_preview}")
                 logger.info(f"TODOs updated: {len(todos)} items")
 
@@ -383,16 +382,66 @@ def update_state_from_agent(state):
     # Update agent config
     if state.values.get("agent_config"):
         logger.info("Agent config found in state")
-        st.session_state.agent_config = state.values["agent_config"]
+        new_config = state.values["agent_config"]
 
-        # Create entrance agent if not exists
-        if st.session_state.entrance_agent is None:
+        # Check if config has changed by comparing serialized versions
+        old_config_dict = None
+        if st.session_state.agent_config is not None:
+            if hasattr(st.session_state.agent_config, "model_dump"):
+                old_config_dict = st.session_state.agent_config.model_dump()
+            else:
+                old_config_dict = st.session_state.agent_config
+
+        new_config_dict = new_config.model_dump() if hasattr(new_config, "model_dump") else new_config
+
+        config_changed = (
+            old_config_dict is None or
+            old_config_dict != new_config_dict
+        )
+
+        logger.info(f"Config changed: {config_changed}")
+        logger.info(f"Old config exists: {old_config_dict is not None}")
+        logger.info(f"New config name: {new_config_dict.get('name') if isinstance(new_config_dict, dict) else 'N/A'}")
+        if old_config_dict:
+            logger.info(f"Old config name: {old_config_dict.get('name') if isinstance(old_config_dict, dict) else 'N/A'}")
+
+            # Detailed comparison
+            if isinstance(old_config_dict, dict) and isinstance(new_config_dict, dict):
+                logger.info("Comparing config dictionaries:")
+                logger.info(f"  Old config keys: {sorted(old_config_dict.keys())}")
+                logger.info(f"  New config keys: {sorted(new_config_dict.keys())}")
+
+                # Check each key
+                all_keys = set(old_config_dict.keys()) | set(new_config_dict.keys())
+                for key in sorted(all_keys):
+                    old_val = old_config_dict.get(key)
+                    new_val = new_config_dict.get(key)
+                    if old_val != new_val:
+                        logger.info(f"  Key '{key}' differs:")
+                        logger.info(f"    Old: {str(old_val)[:200]}")
+                        logger.info(f"    New: {str(new_val)[:200]}")
+
+        if config_changed and old_config_dict:
+            logger.info("Config differences detected - will recreate entrance agent")
+
+        st.session_state.agent_config = new_config
+
+        # Create or recreate entrance agent if config changed
+        if config_changed:
             try:
-                logger.info("Creating entrance agent")
+                action = "Creating" if st.session_state.entrance_agent is None else "Recreating"
+                logger.info(f"{action} entrance agent")
                 st.session_state.entrance_agent = create_agent_from_config(st.session_state.agent_config)
+
+                # Clear entrance messages when recreating agent
+                if action == "Recreating":
+                    logger.info("Clearing entrance messages due to agent recreation")
+                    st.session_state.entrance_messages = []
+
+                message = "✅ Entrance Agent has been created! You can now chat with it in the right panel." if action == "Creating" else "✅ Entrance Agent has been updated with new configuration! Previous chat history has been cleared."
                 st.session_state.builder_messages.append({
                     "role": "system",
-                    "content": "✅ Entrance Agent has been created! You can now chat with it in the right panel."
+                    "content": message
                 })
                 logger.info("Entrance agent created successfully")
             except Exception as e:
@@ -401,6 +450,8 @@ def update_state_from_agent(state):
                     "role": "system",
                     "content": f"⚠️ Failed to create entrance agent: {str(e)}"
                 })
+        else:
+            logger.info("Config unchanged, skipping entrance agent recreation")
 
     # Update mock conversations
     if state.values.get("mock_conversations"):
@@ -511,6 +562,17 @@ with col_left:
             # Generate new thread_id for fresh conversation
             st.session_state.builder_config = {"configurable": {"thread_id": str(uuid.uuid4())}}
             st.rerun()
+
+    # Agent Configuration Display
+    st.markdown("---")
+    if st.session_state.agent_config:
+        with st.expander("⚙️ 生成的 Agent 配置", expanded=False):
+            config_data = st.session_state.agent_config
+            if hasattr(config_data, "model_dump"):
+                config_data = config_data.model_dump()
+            st.json(config_data)
+    else:
+        st.caption("💡 Agent 配置将在生成后显示在这里")
 
     # Process pending input AFTER displaying chat (so user sees their message first)
     if st.session_state.pending_builder_input:

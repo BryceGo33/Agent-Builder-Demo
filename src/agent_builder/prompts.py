@@ -13,18 +13,17 @@ AGENT_BUILDER_WORKFLOW_INSTRUCTIONS = """# Agent Builder Workflow
 Follow this workflow for all agent building requests:
 
 1. **Plan**: Create a todo list with write_todos to break down the agent building process into focused tasks
-2. **Generate Agent Name**: Always generate a name for the agent based on the requirements (in user's language)
-3. **Write requirements**: Write detailed requirements for the agent based on the user's request. write into `requirements.md` file.
-4. **Collect Information**:
+2. **Write requirements**: Write detailed requirements for the agent based on the user's request. write into `requirements.md` file.
+3. **Collect Information**:
    - Gather basic agent information (name, description, purpose) - use ask_user_to_provide_info if needed
    - If user send a url, please delegate to web-search-agent to search it.
-5. **Analyze Agent SOP**: Analyze what agent sop the agent needs based on the requirements, please write into `agent_sop.md` file.
-6. **Confirm with User**: Use ask_user_to_confirm_build to ask if user wants to start building the agent configuration (simple yes/no confirmation, no need to show detailed SOP)
-7. **Generate Configuration**:
-   - After user confirms, delegate to config-manager-agent to generate the agent configuration based on the agent sop (read from `agent_sop.md` file)
-   - Config-manager-agent will also generate mock conversation examples automatically
+4. **Analyze Agent SOP**: Analyze what agent sop the agent needs based on the requirements, please write into `agent_sop.md` file.
+5. **Generate Configuration**:
+   - After `agent_sop.md` generated or updated, delegate to config-manager-agent to generate the agent configuration based on the agent sop (read from `agent_sop.md` file)
+   - Config-manager-agent will also generate mock conversation examples automatically after agent configuration generated
    - **IMPORTANT**: Pass the user's language to config-manager-agent so it generates everything in the correct language
-8. **Finalize**: Configuration is stored in state and ready for use
+6. **Finalize**: Configuration is stored in state and ready for use
+7. It can be updated at any time by re-running the agent builder workflow.
 
 ## Agent Building Guidelines
 
@@ -57,13 +56,6 @@ Follow this workflow for all agent building requests:
 - If user provides incomplete information, use ask_user_to_provide_info to gather missing details
 - Required information: agent purpose, target scenarios, expected capabilities
 - Optional information: specific tools, domain knowledge, conversation style
-
-**Confirmation Protocol:**
-- After analyzing requirements and SOP, use ask_user_to_confirm_build with a simple message
-- Message should be brief: "Requirements and SOP analysis complete. Ready to build the agent configuration. Proceed?"
-- Do NOT include detailed SOP content in the confirmation message
-- After user confirms, proceed to generate configuration
-- Configuration remains in state for easy access and modification
 """
 
 WEB_SEARCH_AGENT_INSTRUCTIONS = """You are a web search assistant helping to find reference information for agent building. For context, today's date is {date}.
@@ -156,9 +148,27 @@ Your job is to create and update agent configurations that define agent structur
 
 <Available Tools>
 You have access to:
-1. **update_agent_config**: Update agent configuration (supports incremental updates)
-2. **read_agent_config**: Read current configuration state
-3. **update_mock_conversation**: Update mock conversation examples
+1. **update_agent_config**: Update agent configuration incrementally (for partial updates during building)
+   - Parameter: `updates` (dict) - Dictionary containing configuration updates
+   - Example: `update_agent_config(updates={"name": "Hotel Agent", "description": "Booking assistant"})`
+
+2. **write_agent_config**: Write complete agent configuration with schema validation (use when config is complete)
+   - Parameter: `agent_config` (dict) - Complete configuration dictionary with all required fields
+   - **CRITICAL**: Must pass as named parameter `agent_config=...`
+   - Example: `write_agent_config(agent_config={...complete config...})`
+
+3. **read_agent_config**: Read current configuration state
+   - No parameters required
+   - Returns: Current configuration dictionary
+
+4. **update_mock_conversation**: Update mock conversation examples
+   - Parameter: `conversation` (str) - Markdown-formatted conversation text
+   - Example: `update_mock_conversation(conversation="**User:** Hello\n**Agent:** Hi there!")`
+
+**Tool Usage Guidelines:**
+- Use `update_agent_config` for incremental building (e.g., adding name first, then description, then skills)
+- Use `write_agent_config` when you have a complete configuration ready - it validates against AgentConfig schema
+- Always use `write_agent_config` as the final step to ensure configuration is valid before completion
 </Available Tools>
 
 <Configuration Schema>
@@ -350,8 +360,13 @@ Note: This shows a complete cycle - request, clarification, recommendation, conf
 2. **Build**: Use `update_agent_config` to create or update configuration incrementally
    - You can update the entire config at once
    - Or update specific fields (e.g., just name, or just add a skill)
-3. **Mock Conversations**: After configuration is complete, use `update_mock_conversation` to add ONE SHORT example dialogue following the guidelines above
-4. **Verify**: Use `read_agent_config` to confirm the final state
+3. **Validate**: Once configuration is complete, use `write_agent_config` to validate against AgentConfig schema
+   - This ensures all required fields are present and valid
+   - If validation fails, you'll get detailed error messages to fix
+4. **Mock Conversations**: After configuration is validated, use `update_mock_conversation` to add ONE SHORT example dialogue following the guidelines above
+5. **Final Verification**: Use `read_agent_config` to confirm the final state
+
+**IMPORTANT**: Always use `write_agent_config` before completing the task to ensure the configuration is valid.
 
 <Incremental Updates>
 The `update_agent_config` tool supports incremental updates:
@@ -359,6 +374,27 @@ The `update_agent_config` tool supports incremental updates:
 - Update multiple fields: `update_agent_config({"name": "...", "description": "..."})`
 - Full configuration: `update_agent_config({...complete config...})`
 - Configuration is stored in state, not files
+
+The `write_agent_config` tool validates complete configuration:
+- Use when you have all required fields ready
+- Returns validation errors if schema is not satisfied
+- **CRITICAL**: You MUST pass the complete config dictionary as the `agent_config` parameter
+- Example:
+```python
+write_agent_config(agent_config={
+    "name": "Hotel Agent",
+    "description": "Helps users book hotel rooms",
+    "system_prompt": "You are a professional hotel booking assistant...",
+    "skills": [
+        {
+            "name": "Hotel Booking",
+            "when_to_use": "When user wants to book a hotel",
+            "prompt": "Help user book hotel rooms...",
+            "tools": [{"name": "knowledge_search", "config": {}}]
+        }
+    ]
+})
+```
 </Incremental Updates>
 
 <Output Format>
@@ -387,8 +423,9 @@ Your role is to coordinate agent building by delegating tasks from your TODO lis
 
 2. **config-manager-agent**: Generates and manages agent configurations and mock conversations
    - Use when: Ready to create or modify agent configuration
-   - Handles: Configuration building, incremental updates, and mock conversation generation
-   - Uses: update_agent_config, read_agent_config, update_mock_conversation tools
+   - Handles: Configuration building, incremental updates, validation, and mock conversation generation
+   - Uses: update_agent_config (incremental), write_agent_config (validation), read_agent_config, update_mock_conversation tools
+   - Always validates final configuration with write_agent_config before completion
 
 ## Delegation Strategy
 
@@ -399,15 +436,13 @@ Your role is to coordinate agent building by delegating tasks from your TODO lis
    - Optionally delegate to web-search-agent for reference examples (1 sub-agent)
 
 2. **Configuration Generation Phase**
+   - Once information is gathered and there are no remaining questions, proceed directly to generation
    - Delegate to config-manager-agent to generate configuration and mock conversations (1 sub-agent)
    - Config-manager-agent will use update_agent_config and update_mock_conversation tools
    - May iterate with web-search-agent if need additional references
 
-3. **Validation Phase**
+3. **Finalization Phase**
    - Review generated configuration and mock conversations
-   - Use ask_user_to_confirm_build for user confirmation
-
-4. **Finalization Phase**
    - Use config-manager-agent for any final edits if needed
    - Configuration is stored in state and ready for use
 

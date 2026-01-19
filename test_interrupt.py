@@ -28,7 +28,7 @@ def ask_user_to_provide_info(confirm_message: str):
     )
 
 # Create a simple agent with interrupt tool
-model = init_chat_model(model="openai:gpt-4o-mini")
+model = init_chat_model(model="openai:gpt-4o")
 checkpointer = InMemorySaver()
 
 agent = create_deep_agent(

@@ -5,7 +5,7 @@ import re
 
 from langchain.agents.middleware.types import AgentMiddleware, AgentState
 from langchain_core.messages import BaseMessage, ToolMessage, HumanMessage, AIMessage
-from langchain_core.tools import tool
+from langchain_core.tools import tool, InjectedToolArg
 from langgraph.prebuilt.tool_node import ToolRuntime
 from langgraph.types import Command
 from pydantic import ValidationError
@@ -59,14 +59,17 @@ class AgentConfigState(AgentState):
 
 
 @tool
-def write_agent_config(config: Dict[str, Any], runtime: ToolRuntime) -> Command | str:
+def write_agent_config(
+    agent_config: Dict[str, Any],
+    runtime: Annotated[ToolRuntime, InjectedToolArg]
+) -> str:
     """Write a complete agent configuration with schema validation.
 
     This tool validates the entire configuration against the AgentConfig schema
     before writing it to state. Use this when you have a complete configuration ready.
 
     Args:
-        config: Complete agent configuration dictionary matching AgentConfig schema.
+        agent_config: Complete agent configuration dictionary matching AgentConfig schema.
             Required fields:
             - name (str, 1-10 chars): Agent name
             - description (str, 1-500 chars): Agent description
@@ -82,7 +85,7 @@ def write_agent_config(config: Dict[str, Any], runtime: ToolRuntime) -> Command 
 
     Example:
         ```python
-        write_agent_config({
+        write_agent_config(agent_config={
             "name": "Hotel Booking Agent",
             "description": "Helps users book hotel rooms",
             "system_prompt": "You are a professional hotel booking assistant...",
@@ -99,7 +102,7 @@ def write_agent_config(config: Dict[str, Any], runtime: ToolRuntime) -> Command 
     """
     try:
         # Validate against AgentConfig schema
-        validated_config = AgentConfig(**config)
+        validated_config = AgentConfig(**agent_config)
 
         return Command(
             update={
@@ -122,7 +125,10 @@ def write_agent_config(config: Dict[str, Any], runtime: ToolRuntime) -> Command 
 
 
 @tool
-def update_agent_config(updates: Dict[str, Any], runtime: ToolRuntime) -> Command | str:
+def update_agent_config(
+    updates: Dict[str, Any],
+    runtime: Annotated[ToolRuntime, InjectedToolArg]
+) -> str:
     """Update agent configuration incrementally.
 
     This tool allows you to build and modify the agent configuration step by step.
@@ -141,12 +147,12 @@ def update_agent_config(updates: Dict[str, Any], runtime: ToolRuntime) -> Comman
     Examples:
         Update only name:
         ```python
-        update_agent_config({"name": "Hotel Booking Agent"})
+        update_agent_config(updates={"name": "Hotel Booking Agent"})
         ```
 
         Update name and description:
         ```python
-        update_agent_config({
+        update_agent_config(updates={
             "name": "Hotel Agent",
             "description": "Helps users book hotel rooms"
         })
@@ -154,7 +160,7 @@ def update_agent_config(updates: Dict[str, Any], runtime: ToolRuntime) -> Comman
 
         Add complete configuration:
         ```python
-        update_agent_config({
+        update_agent_config(updates={
             "name": "Hotel Agent",
             "description": "Booking assistant",
             "system_prompt": "You are a professional...",
@@ -253,7 +259,10 @@ def parse_mock_conversations(conversation: str) -> List[BaseMessage]:
 
 
 @tool
-def update_mock_conversation(conversation: str, runtime: ToolRuntime) -> Command | str:
+def update_mock_conversation(
+    conversation: str,
+    runtime: Annotated[ToolRuntime, InjectedToolArg]
+) -> str:
     """Update mock conversation examples.
 
     Args:
@@ -264,7 +273,7 @@ def update_mock_conversation(conversation: str, runtime: ToolRuntime) -> Command
 
     Example:
         ```python
-        update_mock_conversation('''
+        update_mock_conversation(conversation='''
         # Mock Conversations for Hotel Agent
 
         ## Scenario 1: Simple Booking
@@ -294,10 +303,26 @@ AGENT_CONFIG_SYSTEM_PROMPT = """## Agent Configuration Management
 
 You are now in the agent configuration management mode. You can use the following tools to manage your agent configuration:
 
-- `write_agent_config`: Write complete agent configuration (validates against AgentConfig schema)
-- `update_agent_config`: Update the agent configuration (supports incremental updates)
-- `read_agent_config`: Read the current configuration state
-- `update_mock_conversation`: Update mock conversation examples. Never include the tool names in conversation
+- `update_agent_config(updates={...})`: Update the agent configuration incrementally (for partial updates during building)
+  - Parameter: `updates` (dict) - Dictionary containing configuration updates
+  - Example: `update_agent_config(updates={"name": "Hotel Agent"})`
+
+- `write_agent_config(agent_config={...})`: Write complete agent configuration with schema validation (use when config is complete)
+  - Parameter: `agent_config` (dict) - Complete configuration dictionary with all required fields
+  - **CRITICAL**: Must pass as named parameter `agent_config=...`
+  - Example: `write_agent_config(agent_config={"name": "...", "description": "...", "system_prompt": "...", "skills": [...]})`
+
+- `read_agent_config()`: Read the current configuration state
+  - No parameters required
+
+- `update_mock_conversation(conversation="...")`: Update mock conversation examples
+  - Parameter: `conversation` (str) - Markdown-formatted conversation text
+  - Never include tool names in conversation
+
+**Tool Selection Guidelines:**
+- Use `update_agent_config` for incremental building (e.g., adding name, then description, then skills)
+- Use `write_agent_config` when you have a complete configuration ready - it validates against AgentConfig schema and will return errors if invalid
+- Always use `write_agent_config` as the final step to ensure configuration is valid
 
 Please select a tool to proceed.
 """

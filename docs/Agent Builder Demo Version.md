@@ -200,7 +200,6 @@ graph TD
 
 *   默认工具
 *   `ask_user_to_provide_info`: 用于向用户获取信息（用interrupt实现）
-*   `ask_user_to_confirm_build: 在sop生成完成后，用于用户确认是否开始构建agent（用interrupt实现）
 
     
 

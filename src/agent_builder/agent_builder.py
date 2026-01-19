@@ -24,7 +24,6 @@ from src.agent_builder.tools import (
     fetch_webpage_content,
     think_tool,
     ask_user_to_provide_info,
-    ask_user_to_confirm_build,
 )
 from src.agent_builder.models import AVAILABLE_TOOLS, AgentConfig
 from src.agent_builder.middleware import AgentConfigMiddleware
@@ -186,7 +185,6 @@ if __name__ == "__main__":
         checkpointer=checkpointer,
         tools=[
             ask_user_to_provide_info,
-            ask_user_to_confirm_build,
         ],
         system_prompt=INSTRUCTIONS,
         subagents=[web_search_agent, config_manager_agent],
