@@ -1,9 +1,6 @@
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
 *.so
-.Python
 build/
 develop-eggs/
 dist/
@@ -39,7 +36,7 @@ tmp/*
 *~
 .DS_Store
 CLAUDE.md
-。claude
+.claude
 
 # Streamlit
 .streamlit/
