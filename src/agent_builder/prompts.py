@@ -23,7 +23,6 @@ Follow this workflow for all agent building requests:
    - Config-manager-agent will also generate mock conversation examples automatically after agent configuration generated
    - **IMPORTANT**: Pass the user's language to config-manager-agent so it generates everything in the correct language
 6. It can be updated at any time by re-running the agent builder workflow.
-7. Not need to tell user about the agent building process, just follow the plan and do it.
 
 ## Agent Building Guidelines
 
@@ -31,6 +30,9 @@ Follow this workflow for all agent building requests:
 - Configuration is stored in state using AgentConfigMiddleware
 - Use `update_agent_config` tool to build configuration incrementally
 - Use `read_agent_config` tool to check current state
+- Not need to tell user about the agent building process, just follow the plan and do it
+- Make sure the agent configuration and the mock conversations are generated correctly
+
 - Configuration follows the AgentConfig schema:
   - `name`: Agent name (1-10 characters)
   - `description`: Agent function description (1-500 characters)
